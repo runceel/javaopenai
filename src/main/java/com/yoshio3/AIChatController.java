@@ -1,6 +1,15 @@
 package com.yoshio3;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+
 import com.azure.ai.openai.OpenAIClient;
 import com.azure.ai.openai.OpenAIClientBuilder;
 import com.azure.ai.openai.models.ChatCompletions;
@@ -9,19 +18,10 @@ import com.azure.ai.openai.models.ChatRequestAssistantMessage;
 import com.azure.ai.openai.models.ChatRequestMessage;
 import com.azure.ai.openai.models.ChatRequestSystemMessage;
 import com.azure.ai.openai.models.ChatRequestUserMessage;
-import com.azure.core.credential.AzureKeyCredential;
-import com.azure.identity.ManagedIdentityCredential;
-import com.azure.identity.ManagedIdentityCredentialBuilder;
+import com.azure.core.credential.TokenCredential;
+import com.azure.identity.DefaultAzureCredentialBuilder;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.util.ArrayList;
-import java.util.List;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-
 
 @RestController
 public class AIChatController {
@@ -40,17 +40,17 @@ public class AIChatController {
     private static final String OPEN_AI_CHAT_MODEL = "gpt-4o";
 
     /**
-     * This API is used to chat with OpenAI's GPT-4 model. And if user ask somethings, it will
-     * return the message with Pirate language.
-     * 
+     * This API is used to chat with OpenAI's GPT-4 model. And if user ask
+     * somethings, it will return the message with Pirate language.
+     *
      * Ex. You can invoke the API by using the following command: curl -X POST
-     * http://localhost:8080/askAI -H "Content-Type: application/json" -d '{"message":"Please tell
-     * me about the appeal of Spring Boot in Japanese."}'
-     * 
+     * http://localhost:8080/askAI -H "Content-Type: application/json" -d
+     * '{"message":"Please tell me about the appeal of Spring Boot in
+     * Japanese."}'
+     *
      * @param message RequestMessage
      * @return String Response from OpenAI
      */
-
     @PostMapping("/askAI")
     public String chat(@RequestBody RequestMessage message) {
         return getResponseFromOpenAI(message.getMessage());
@@ -58,33 +58,39 @@ public class AIChatController {
 
     /**
      * This method is used to get the response from OpenAI.
-     * 
-     * For production environment, you can use Managed Identity to authenticate with OpenAI. If you
-     * want to use Managed Identity, please use the ManagedIdentityCredentialBuilder.
-     * 
-     * For local development, you can use AzureKeyCredential to authenticate with OpenAI.
-     * 
+     *
+     * For production environment, you can use Managed Identity to authenticate
+     * with OpenAI. If you want to use Managed Identity, please use the
+     * ManagedIdentityCredentialBuilder.
+     *
+     * For local development, you can use AzureKeyCredential to authenticate
+     * with OpenAI.
+     *
      * @param message RequestMessage
      * @return String Response from OpenAI
      */
-
     private String getResponseFromOpenAI(String message) {
         try {
             LOGGER.debug("{} is input from user.", message);
             LOGGER.debug("OpenAI Endpoint is {} ", openAIEndpoint);
             LOGGER.debug("userManagedIDClientId is {} ", userManagedIDClientId);
 
-            ManagedIdentityCredential credential =
-                    new ManagedIdentityCredentialBuilder().clientId(userManagedIDClientId).build();
+            // Managed ID を使って OpenAIClient を作成
+            // TokenCredential credential = 
+            //     new AzureCliCredentialBuilder().build();
+            // TokenCredential credential =
+            //         new ManagedIdentityCredentialBuilder().clientId(userManagedIDClientId).build();
+            TokenCredential credential = new DefaultAzureCredentialBuilder()
+                    .managedIdentityClientId(userManagedIDClientId)
+                    .build();
             LOGGER.debug("Managed Identity Credential was created.");
-            // Create OpenAI client with Managed Identity
             OpenAIClient openAIClient = new OpenAIClientBuilder().credential(credential)
                     .endpoint(openAIEndpoint).buildClient();
-            LOGGER.debug("OpenAI Client Instance was created.");
 
-            // Create OpenAI client without Managed Identity (For local development)
+            // API Key 認証を使って OpenAIClient を作成 (開発用途)
             // OpenAIClient openAIClient = new OpenAIClientBuilder().endpoint(openAIEndpoint)
-            // .credential(new AzureKeyCredential(openAIKey)).buildClient();
+            //     .credential(new AzureKeyCredential(openAIKey)).buildClient();
+            LOGGER.debug("OpenAI Client Instance was created.");
 
             // Create Chat Request Messages
             List<ChatRequestMessage> chatMessages = new ArrayList<>();
@@ -94,16 +100,16 @@ public class AIChatController {
             chatMessages.add(
                     new ChatRequestAssistantMessage("Of course, me hearty! What can I do for ye?"));
             chatMessages.add(new ChatRequestUserMessage(message));
-            debugChatRequestMessageLog(chatMessages );
+            debugChatRequestMessageLog(chatMessages);
 
-            ChatCompletionsOptions chatCompletionsOptions =
-                    new ChatCompletionsOptions(chatMessages);
+            ChatCompletionsOptions chatCompletionsOptions
+                    = new ChatCompletionsOptions(chatMessages);
             LOGGER.debug("Prompt message was created.");
 
-            LOGGER.debug("OpenAI Chat Model is {} ", OPEN_AI_CHAT_MODEL);            
+            LOGGER.debug("OpenAI Chat Model is {} ", OPEN_AI_CHAT_MODEL);
             // Invoke OpenAI Chat API
-            ChatCompletions chatCompletions =
-                    openAIClient.getChatCompletions(OPEN_AI_CHAT_MODEL, chatCompletionsOptions);
+            ChatCompletions chatCompletions
+                    = openAIClient.getChatCompletions(OPEN_AI_CHAT_MODEL, chatCompletionsOptions);
 
             StringBuilder response = new StringBuilder();
             chatCompletions.getChoices()
@@ -131,7 +137,7 @@ public class AIChatController {
         try {
             // Convert object to JSON string
             String jsonString = objectMapper.writeValueAsString(chatMessages);
-            LOGGER.debug("Chat messages are : {}", jsonString);   
+            LOGGER.debug("Chat messages are : {}", jsonString);
         } catch (JsonProcessingException e) {
             e.printStackTrace();
         }

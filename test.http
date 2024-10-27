@@ -1,0 +1,14 @@
+POST https://jjug-ai-app.gentlesky-5a935a31.japaneast.azurecontainerapps.io/askAI
+Content-Type: application/json
+
+{
+    "message": "Javaを作成したのは誰ですか？"
+}
+
+###
+POST http://localhost:8080/askAI 
+Content-Type: application/json
+
+{
+    "message": "Javaを作成したのは誰ですか？"
+}
